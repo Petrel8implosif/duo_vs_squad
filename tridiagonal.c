@@ -1,96 +1,91 @@
 #include <stdio.h>
 #include <math.h>
 
+#define N 5  // Matrix size
 
-/**
- * Tridiagonalizes a symmetric band matrix using similarity transformations (Givens rotations).
- *
- * @param A Row-major stored band matrix of size n × (k + 1)
- * @param n Size of the matrix
- * @param k Number of nonzero subdiagonals
- * @param d Output array of size n (diagonal elements of the tridiagonal matrix)
- * @param e Output array of size n-1 (subdiagonal elements)
- */
- void tridiagonalize_band(double *A, int n, int k, double *d, double *e) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 2; j < k + 1; j++) { // Start from the 2nd superdiagonal
-            double elim = A[i * (k + 1) + j];
-            if (fabs(elim) > 1e-10) {
-                // Perform Givens rotation
-                double a = A[i * (k + 1) + j - 1];
-                double b = elim;
+// Function to compute Givens rotation
+void givens_rotation(double a, double b, double *c, double *s) {
+    double norm = sqrt(a * a + b * b);
+    if (norm < 1e-10) {
+        *c = 1.0;
+        *s = 0.0;
+    } else {
+        *c = a / norm;
+        *s = -b / norm;
+    }
+}
+
+// Function to apply Givens rotation to a matrix
+void apply_givens(double A[N][N], double c, double s, int i, int j) {
+    for (int k = 0; k < N; k++) {
+        double temp = c * A[i][k] - s * A[j][k];
+        A[j][k] = s * A[i][k] + c * A[j][k];
+        A[i][k] = temp;
+    }
+
+    for (int k = 0; k < N; k++) {
+        double temp = c * A[k][i] - s * A[k][j];
+        A[k][j] = s * A[k][i] + c * A[k][j];
+        A[k][i] = temp;
+    }
+}
+
+// Function to tridiagonalize a symmetric matrix using Givens rotations
+void tridiagonalize(double A[N][N], double d[N], double e[N - 1]) {
+    for (int j = 0; j < N - 2; j++) {  // Iterate through columns
+        for (int i = N - 1; i > j + 1; i--) {  // Work from the bottom row upward
+            if (fabs(A[i][j]) > 1e-10) { // If significant, apply Givens rotation
                 double c, s;
-                if (fabs(b) > fabs(a)) {
-                    double tau = -a / b;
-                    s = 1 / sqrt(1 + tau * tau);
-                    c = s * tau;
-                } else {
-                    double tau = -b / a;
-                    c = 1 / sqrt(1 + tau * tau);
-                    s = c * tau;
-                }
+                givens_rotation(A[i - 1][j], A[i][j], &c, &s);
 
-                // Update diagonal elements during Givens rotation
-                A[i * (k + 1) + j - 1] = c * a - s * b;
-                A[i * (k + 1) + j] = 0.0;
-
-                for (int l = j + 1; l < k + 1; l++) {
-                    double temp = c * A[i * (k + 1) + l - 1] - s * A[i * (k + 1) + l];
-                    A[i * (k + 1) + l] = s * A[i * (k + 1) + l - 1] + c * A[i * (k + 1) + l];
-                    A[i * (k + 1) + l - 1] = temp;
-                }
-
-                // Update columns below the diagonal
-                for (int l = i + 1; l < n; l++) {
-                    double temp = c * A[l * (k + 1) + j - 1] - s * A[l * (k + 1) + j];
-                    A[l * (k + 1) + j] = s * A[l * (k + 1) + j - 1] + c * A[l * (k + 1) + j];
-                    A[l * (k + 1) + j - 1] = temp;
-                }
+                // Apply Givens rotation to zero out A[i][j]
+                apply_givens(A, c, s, i - 1, i);
             }
         }
+    }
 
-        // Extract and update diagonal and subdiagonal elements
-        d[i] = A[i * (k + 1)];
-        if (i < n - 1) {
-            e[i] = A[i * (k + 1) + 1];
+    // Extract diagonal and subdiagonal elements
+    for (int i = 0; i < N; i++) {
+        d[i] = A[i][i];  // Diagonal elements
+        if (i < N - 1) {
+            e[i] = A[i][i + 1];  // First subdiagonal elements
         }
     }
 }
 
-
-
+// Main function
 int main() {
-    int n = 5; // Matrix size
-    int k = 2; // Bandwidth
-
-    // Symmetric band matrix stored in row-major format (n × (k + 1))
-    double A[] = {
-        4, 1, 2,  // Row 0: diagonal, 1st superdiagonal, 2nd superdiagonal
-        3, 1, 2,  // Row 1: diagonal, 1st superdiagonal, 2nd superdiagonal
-        4, 1, 0,  // Row 2: diagonal, 1st superdiagonal, 2nd superdiagonal
-        5, 1, 0,  // Row 3: diagonal, 1st superdiagonal, 2nd superdiagonal
-        3, 0, 0   // Row 4: diagonal, (rest are padding)
+    // Example symmetric matrix stored in full N x N format
+    double A[N][N] = {
+        {4.0, 1.0, 2.0, 0.0, 0.0},
+        {1.0, 3.0, 1.0, 2.0, 0.0},
+        {2.0, 1.0, 4.0, 1.0, 0.0},
+        {0.0, 2.0, 1.0, 5.0, 1.0},
+        {0.0, 0.0, 0.0, 1.0, 3.0}
     };
 
-    double d[5], e[4]; // Output arrays
+    double d[N], e[N - 1];  // Output arrays for tridiagonal matrix
 
-    tridiagonalize_band(A, n, k, d, e);
+    // Perform tridiagonalization
+    tridiagonalize(A, d, e);
 
+    // Output the final tridiagonal matrix
     printf("\nFinal Tridiagonal Matrix:\n");
     printf("Diagonal (d): ");
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < N; i++) {
         printf("%lf ", d[i]);
     }
     printf("\nSubdiagonal (e): ");
-    for (int i = 0; i < n - 1; i++) {
+    for (int i = 0; i < N - 1; i++) {
         printf("%lf ", e[i]);
     }
     printf("\n");
 
+    // Output modified matrix
     printf("\nModified Matrix A:\n");
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < k + 1; j++) {
-            printf("%lf ", A[i * (k + 1) + j]);
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            printf("%lf ", A[i][j]);
         }
         printf("\n");
     }
