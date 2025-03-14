@@ -37,25 +37,29 @@ void apply_givens(double A[N][N], double c, double s, int i, int j) {
 }
 
 void tridiagonalize(double A[N][N]) {
-    for (int j = 0; j < N - 2; j++) {  // Iterate through columns
-        for (int i = N - 1; i > j + 1; i--) {  // Work from the bottom row upward
-            if (fabs(A[i][j]) > 1e-10) { // If significant, apply Givens rotation
-                double c, s;
-                givens_rotation(A[i - 1][j], A[i][j], &c, &s);
+    int iter = 0;
+    int i;
+    for (int j = 0; j < N - 1; j++) {  
+        iter++;
+        i = j+1;
+        if (fabs(A[i][j]) > 1e-10) {
+                // If significant, apply Givens rotation
+            double c, s;
+            givens_rotation(A[i - 1][j], A[i][j], &c, &s);
 
-                // Apply Givens rotation to zero out A[i][j]
-                apply_givens(A, c, s, i - 1, i);
-                // Print the matrix A after applying Givens rotation
-                printf("Matrix A after applying Givens rotation:\n");
-                for (int x = 0; x < N; x++) {
-                    for (int y = 0; y < N; y++) {
-                        printf("%f ", A[x][y]);
-                    }
-                    printf("\n");
+            // Apply Givens rotation to zero out A[i][j]
+            apply_givens(A, c, s, i - 1, i);
+            // Print the matrix A after applying Givens rotation
+            printf("Matrix A after applying Givens rotation:\n");
+            for (int x = 0; x < N; x++) {
+                for (int y = 0; y < N; y++) {
+                    printf("%f ", A[x][y]);
                 }
+                printf("\n");
             }
         }
     }
+    printf("Number of iterations: %d\n", iter);
 }
 
 
@@ -138,13 +142,25 @@ int main(){
     free(e);*/
 
     double A[N][N] = {
-        {1.0, 2.0, 3.0, 4.0, 5.0},
-        {2.0, 3.0, 4.0, 5.0, 6.0},
-        {3.0, 4.0, 5.0, 6.0, 7.0},
-        {4.0, 5.0, 6.0, 7.0, 8.0},
-        {5.0, 6.0, 7.0, 8.0, 9.0}
+        {1.0, 7.0, 0.0, 0.0, 0.0},
+        {7.0, 3.0, 2.0, 0.0, 0.0},
+        {0.0, 2.0, 4.0, 8.0, 0.0},
+        {0.0, 0.0, 8.0, 5.0, 11.0},
+        {0.0, 0.0, 0.0, 11.0, 6.0}
     };
 
     tridiagonalize(A);
+    FILE *file = fopen("matrix_A.txt", "w");
+    if (file != NULL) {
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                fprintf(file, "%f ", A[i][j]);
+            }
+            fprintf(file, "\n");
+        }
+        fclose(file);
+    } else {
+        printf("Error opening file for writing.\n");
+    }
     return 0;
 }
