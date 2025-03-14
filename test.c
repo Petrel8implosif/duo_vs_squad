@@ -1,33 +1,90 @@
 #include <stdio.h>
+#include <math.h>
 
-#define N 5   // Matrix size
-#define K 2   // Bandwidth
+// Function to compute Givens rotation coefficients
+void compute_givens(double a, double b, double *c, double *s) {
+    if (b == 0) {
+        *c = 1.0;
+        *s = 0.0;
+    } else {
+        double r = sqrt(a * a + b * b);
+        *c = a / r;
+        *s = -b / r;
+    }
+}
 
-void print_non_diag_non_subdiag(double *A) {
-    printf("Elements not on the diagonal or first subdiagonal:\n");
+// Function to apply Givens rotation to a band matrix
+void apply_givens_band(double *A, int n, int k, int i, int j, double c, double s) {
+    if (i >= n || j >= n || i >= j) return;
 
-    for (int i = 0; i < N; i++) {
-        for (int j = 2; j <= K; j++) {  // Start from 2 to exclude diagonal and first subdiagonal
-            int index = i * (K + 1) + j;  // Compute compact storage index
-            if (index < N * (K + 1)) {  // Ensure index is within bounds
-                printf("%lf ", A[index]);
+    // Update row elements within band structure
+    for (int col = 0; col < k; col++) {
+        if (i + col < n && j + col < n) { 
+            double temp = c * A[i * k + col] - s * A[j * k + col];
+            A[j * k + col] = s * A[i * k + col] + c * A[j * k + col];
+            A[i * k + col] = temp;
+        }
+    }
+
+    // Update column elements within band structure
+    for (int row = i; row < j; row++) {
+        if (row + k < n) {
+            double temp = c * A[row * k + (k - 1)] - s * A[(row + 1) * k + (k - 2)];
+            A[(row + 1) * k + (k - 2)] = s * A[row * k + (k - 1)] + c * A[(row + 1) * k + (k - 2)];
+            A[row * k + (k - 1)] = temp;
+        }
+    }
+}
+
+// Function to tridiagonalize a symmetric band matrix stored in compact form
+void tridiagonalize_band(double *A, int n, int k, double *d, double *e) {
+    for (int i = 0; i < n - 2; i++) {
+        for (int j = k - 1; j > 0; j--) {
+            if (fabs(A[i * k + j]) > 1e-10) { 
+                double c, s;
+                compute_givens(A[i * k], A[i * k + j], &c, &s);
+                apply_givens_band(A, n, k, i, i + j, c, s);
             }
         }
     }
-    printf("\n");
+
+    // Extract the diagonal and subdiagonal elements
+    for (int i = 0; i < n; i++) {
+        d[i] = A[i * k]; // Diagonal elements
+        if (i < n - 1) {
+            e[i] = A[i * k + 1]; // Subdiagonal elements
+        }
+    }
 }
 
+// Example usage
 int main() {
-    // Symmetric band matrix stored in row-major compact format (N × (K + 1))
+    int n = 5; // Matrix size
+    int k = 3; // Bandwidth
+
+    // Example symmetric band matrix in compact form
     double A[] = {
-        0, 0, 4,  // Row 0
-        0, 1, 3,  // Row 1
-        2, 1, 4,  // Row 2
-        2, 1, 5,  // Row 3
-        0, 1, 3   // Row 4
+        4.0, 1.0, 2.0, // format: diagonal, subdiagonal, sub-subdiagonal
+        3.0, 1.0, 2.0,
+        4.0, 1.0, 0.0,
+        5.0, 1.0, 0.0,
+        3.0, 0.0, 0.0
     };
 
-    print_non_diag_non_subdiag(A);
+    double d[n], e[n - 1]; // Arrays for diagonal and subdiagonal elements
+
+    tridiagonalize_band(A, n, k, d, e);
+
+    // Output results
+    printf("Diagonal (d): ");
+    for (int i = 0; i < n; i++) {
+        printf("%lf ", d[i]);
+    }
+    printf("\nSubdiagonal (e): ");
+    for (int i = 0; i < n - 1; i++) {
+        printf("%lf ", e[i]);
+    }
+    printf("\n");
 
     return 0;
 }
