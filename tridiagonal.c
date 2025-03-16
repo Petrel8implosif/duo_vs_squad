@@ -29,7 +29,7 @@ void apply_givens(double *A, int n, int k, double c, double s, int i, int j) {
 }
 
 // Function to tridiagonalize a symmetric band matrix
-void tridiagonalize_band(double *A, int n, int k, double *d, double *e) {
+void tridiagonalize_full(double *A, int n, int k, double *d, double *e) {
     for (int j = 0; j < n - 2; j++) {
         for (int i = n - 1; i > j + 1; i--) {
             if (fabs(A[i * n + j]) > 1e-10) {
@@ -63,7 +63,7 @@ int main() {
     };
     double d[5], e[5];
 
-    tridiagonalize_band(A, n, k, d, e);
+    tridiagonalize_full(A, n, k, d, e);
 
     printf("\nFinal Tridiagonal Matrix:\n");
     printf("Diagonal (d): ");
