@@ -1,90 +1,115 @@
 #include <stdio.h>
 #include <math.h>
 
-// Function to compute Givens rotation coefficients
-void compute_givens(double a, double b, double *c, double *s) {
-    if (b == 0) {
+#define TOL 1e-12
+
+void givens_rotation(double a, double b, double *c, double *s) {
+    double r = hypot(a, b);
+    if (r < TOL) {
         *c = 1.0;
         *s = 0.0;
     } else {
-        double r = sqrt(a * a + b * b);
         *c = a / r;
         *s = -b / r;
     }
 }
 
-// Function to apply Givens rotation to a band matrix
-void apply_givens_band(double *A, int n, int k, int i, int j, double c, double s) {
-    if (i >= n || j >= n || i >= j) return;
+double eliminate_element(double *A, int n, int m, int i, int j) {
+    int idx_jm1 = i * (m + 1) + (j - 1);
+    int idx_j = i * (m + 1) + j;
 
-    // Update row elements within band structure
-    for (int col = 0; col < k; col++) {
-        if (i + col < n && j + col < n) { 
-            double temp = c * A[i * k + col] - s * A[j * k + col];
-            A[j * k + col] = s * A[i * k + col] + c * A[j * k + col];
-            A[i * k + col] = temp;
+    double a = A[idx_jm1];
+    double b = A[idx_j];
+    double c, s;
+    givens_rotation(a, b, &c, &s);
+
+    // Apply rotation to row i
+    A[idx_jm1] = c * a - s * b;
+    A[idx_j] = 0.0;
+
+    // Generate bulge in row i+1
+    double bulge = 0.0;
+    if (i + 1 < n) {
+        int ip1 = i + 1;
+        int col_in_ip1 = j - 1; // Corresponding column in next row
+        if (col_in_ip1 >= 0) {
+            int idx_ip1 = ip1 * (m + 1) + col_in_ip1;
+            bulge = s * A[idx_ip1];
+            A[idx_ip1] = c * A[idx_ip1];
         }
     }
+    return bulge;
+}
 
-    // Update column elements within band structure
-    for (int row = i; row < j; row++) {
-        if (row + k < n) {
-            double temp = c * A[row * k + (k - 1)] - s * A[(row + 1) * k + (k - 2)];
-            A[(row + 1) * k + (k - 2)] = s * A[row * k + (k - 1)] + c * A[(row + 1) * k + (k - 2)];
-            A[row * k + (k - 1)] = temp;
+void chase_bulge(double *A, int n, int m, int start_row, double bulge) {
+    int i = start_row;
+    while (i < n - 1 && fabs(bulge) > TOL) {
+        int row = i + 1;
+        int col = 1; // Bulge always appears in first superdiagonal during chase
+        
+        // Get elements to eliminate bulge
+        int idx = row * (m + 1) + 0; // Diagonal element
+        double diag = A[idx];
+        
+        double c, s;
+        givens_rotation(diag, bulge, &c, &s);
+        
+        // Update diagonal and superdiagonal
+        A[idx] = c * diag - s * bulge;
+        if (m >= 1) {
+            A[row * (m + 1) + 1] = c * A[row * (m + 1) + 1];
         }
+        
+        // Propagate bulge to next row
+        if (row + 1 < n) {
+            int next_idx = (row + 1) * (m + 1) + 0;
+            bulge = s * A[next_idx];
+            A[next_idx] = c * A[next_idx];
+        } else {
+            bulge = 0.0;
+        }
+        
+        i++;
     }
 }
 
-// Function to tridiagonalize a symmetric band matrix stored in compact form
-void tridiagonalize_band(double *A, int n, int k, double *d, double *e) {
-    for (int i = 0; i < n - 2; i++) {
-        for (int j = k - 1; j > 0; j--) {
-            if (fabs(A[i * k + j]) > 1e-10) { 
-                double c, s;
-                compute_givens(A[i * k], A[i * k + j], &c, &s);
-                apply_givens_band(A, n, k, i, i + j, c, s);
+void tridiagonalize_band(double *A, int n, int m, double *d, double *e) {
+    for (int i = 0; i < n; i++) {
+        for (int j = m; j >= 2; j--) {
+            if (i + j >= n) continue; // Stay within matrix bounds
+            int idx = i * (m + 1) + j;
+            if (fabs(A[idx]) > TOL) {
+                double bulge = eliminate_element(A, n, m, i, j);
+                chase_bulge(A, n, m, i, bulge);
             }
         }
     }
 
-    // Extract the diagonal and subdiagonal elements
+    // Extract results
     for (int i = 0; i < n; i++) {
-        d[i] = A[i * k]; // Diagonal elements
-        if (i < n - 1) {
-            e[i] = A[i * k + 1]; // Subdiagonal elements
-        }
+        d[i] = A[i * (m + 1) + 0];
+        if (i < n - 1) e[i] = A[i * (m + 1) + 1];
     }
 }
 
-// Example usage
 int main() {
-    int n = 5; // Matrix size
-    int k = 3; // Bandwidth
-
-    // Example symmetric band matrix in compact form
+    int n = 5, m = 2;
     double A[] = {
-        4.0, 1.0, 2.0, // format: diagonal, subdiagonal, sub-subdiagonal
+        4.0, 1.0, 2.0,
         3.0, 1.0, 2.0,
         4.0, 1.0, 0.0,
         5.0, 1.0, 0.0,
         3.0, 0.0, 0.0
     };
+    
+    double d[n], e[n-1];
+    tridiagonalize_band(A, n, m, d, e);
 
-    double d[n], e[n - 1]; // Arrays for diagonal and subdiagonal elements
-
-    tridiagonalize_band(A, n, k, d, e);
-
-    // Output results
     printf("Diagonal (d): ");
-    for (int i = 0; i < n; i++) {
-        printf("%lf ", d[i]);
-    }
+    for (int i = 0; i < n; i++) printf("%.6f ", d[i]);
     printf("\nSubdiagonal (e): ");
-    for (int i = 0; i < n - 1; i++) {
-        printf("%lf ", e[i]);
-    }
+    for (int i = 0; i < n-1; i++) printf("%.6f ", e[i]);
     printf("\n");
-
+    
     return 0;
 }
