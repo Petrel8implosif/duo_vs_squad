@@ -10,6 +10,7 @@
 #define idxQ(i, j, m) ((i) + (j) * (m))
 #define idxR(i, j) ((i) + (j) * n)
 
+/*
 void givens_rotation(double a, double b, double *c, double *s) {
     double norm = sqrt(a * a + b * b);
     if (norm < 1e-10) {
@@ -38,31 +39,40 @@ void apply_givens(double A[N][N], double c, double s, int i, int j) {
 
 void tridiagonalize(double A[N][N]) {
     int iter = 0;
-    int i;
-    for (int j = 0; j < N - 1; j++) {  
-        iter++;
-        i = j+1;
-        if (fabs(A[i][j]) > 1e-10) {
-                // If significant, apply Givens rotation
-            double c, s;
-            givens_rotation(A[i - 1][j], A[i][j], &c, &s);
-
-            // Apply Givens rotation to zero out A[i][j]
-            apply_givens(A, c, s, i - 1, i);
-            // Print the matrix A after applying Givens rotation
-            printf("Matrix A after applying Givens rotation:\n");
-            for (int x = 0; x < N; x++) {
-                for (int y = 0; y < N; y++) {
-                    printf("%f ", A[x][y]);
+    for (int j = 0; j < N - 1; j++) {  // Iterate through columns
+        for (int i = N - 1; i > j; i--) {  // Work from the bottom row upward
+            if (i == j+1) {
+                printf(" i = j+1\n");
+                printf("Matrix A before applying Givens rotation:\n");
+                for (int x = 0; x < N; x++) {
+                    for (int y = 0; y < N; y++) {
+                        printf("%f ", A[x][y]);
+                    }
+                    printf("\n");
                 }
-                printf("\n");
+            }
+            if (fabs(A[i][j]) > 1e-10) {
+                iter++;
+                 // If significant, apply Givens rotation
+                double c, s;
+                givens_rotation(A[i - 1][j], A[i][j], &c, &s);
+
+                // Apply Givens rotation to zero out A[i][j]
+                apply_givens(A, c, s, i - 1, i);
+                // Print the matrix A after applying Givens rotation
+                printf("Matrix A after applying Givens rotation:\n");
+                for (int x = 0; x < N; x++) {
+                    for (int y = 0; y < N; y++) {
+                        printf("%f ", A[x][y]);
+                    }
+                    printf("\n");
+                }
             }
         }
     }
-    printf("Number of iterations: %d\n", iter);
 }
-
-
+*/
+/*
 void fill_A(double *d, double *e, int n, double *A){
     for (int i = 0; i < n-1; i++) {
         A[i* 3 + 1] = d[i];
@@ -70,7 +80,7 @@ void fill_A(double *d, double *e, int n, double *A){
         A[i* 3 + 3] = e[i];
     }
     A[n*3 - 2] = d[n-1];
-}
+} */
 
 double trouver_mu(double *d, double *e, int m) {
     double a = d[m-2];
@@ -87,15 +97,16 @@ double trouver_mu(double *d, double *e, int m) {
     printf("mu = %f\n", mu);
     return mu;
 }
-
+/*
 void rotation_qr(double *d, double *e, int m, double c, double s) {
     double temp = d[0];
     d[0] = c * c * temp + 2 * c * s * e[0] + s * s * d[1];
     d[1] = s * s * temp - 2 * c * s * e[0] + c * c * d[1];
     e[0] = c * e[0] - s * temp;
-}
+} */
 
 
+/*
 int qr_step(double *d, double *e, double m, double eps, double* Q){
     double mu = trouver_mu(d, e, m);
     double* shifted_d = (double*)malloc(m * sizeof(double));
@@ -113,7 +124,89 @@ int qr_step(double *d, double *e, double m, double eps, double* Q){
     }
 
     return m-1;
+} */
+
+
+// Fonction pour calculer les coefficients c et s de la rotation de Givens
+void givens_rotation(double a, double b, double *c, double *s) {
+    double hypot = sqrt(a * a + b * b);
+    *c = a / hypot;
+    *s = -b / hypot;
 }
+
+// Applique la décomposition QR par Givens
+void qr_givens(double A[N][N]) {
+    // Initialisation de R avec A
+    double R[N][N];
+    double Q[N][N];
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            R[i][j] = A[i][j];
+        }
+    }
+
+    // Initialisation de Q à l'identité
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            Q[i][j] = (i == j) ? 1.0 : 0.0;
+        }
+    }
+
+    // Application des rotations de Givens
+    for (int i = 0; i < N - 1; i++) {
+        for (int j = i + 1; j < N; j++) {
+            double c, s;
+            givens_rotation(R[i][i], R[j][i], &c, &s);
+
+            // Appliquer la rotation à R (modifie lignes i et j)
+            for (int k = 0; k < N; k++) {
+                double R_ik = R[i][k];
+                double R_jk = R[j][k];
+                R[i][k] = c * R_ik - s * R_jk;
+                R[j][k] = s * R_ik + c * R_jk;
+            }
+
+            // Appliquer la rotation à Q (modifie colonnes i et j)
+            for (int k = 0; k < N; k++) {
+                double Q_ki = Q[k][i];
+                double Q_kj = Q[k][j];
+                Q[k][i] = c * Q_ki - s * Q_kj;
+                Q[k][j] = s * Q_ki + c * Q_kj;
+            }
+        }
+    }
+    // Calculate A = Q^T * A * Q
+    double temp[N][N] = {0};
+
+    // temp = Q^T * A
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            for (int k = 0; k < N; k++) {
+                temp[i][j] += Q[k][i] * A[k][j];
+            }
+        }
+    }
+
+    // A = temp * Q
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            A[i][j] = 0;
+            for (int k = 0; k < N; k++) {
+                A[i][j] += temp[i][k] * Q[k][j];
+            }
+        }
+    }
+
+    // Print the matrix A after applying Givens rotation
+    printf("Matrix A after applying Givens rotation:\n");
+    for (int x = 0; x < N; x++) {
+        for (int y = 0; y < N; y++) {
+            printf("%f ", A[x][y]);
+        }
+        printf("\n");
+    }
+}
+
 int main(){
     /*
     double *d = (double *)malloc(N * sizeof(double));
@@ -142,14 +235,31 @@ int main(){
     free(e);*/
 
     double A[N][N] = {
-        {1.0, 7.0, 0.0, 0.0, 0.0},
-        {7.0, 3.0, 2.0, 0.0, 0.0},
-        {0.0, 2.0, 4.0, 8.0, 0.0},
-        {0.0, 0.0, 8.0, 5.0, 11.0},
-        {0.0, 0.0, 0.0, 11.0, 6.0}
+        {1.0, 7.0, 0.0, 9.0, 0.0},
+        {7.0, 3.0, 2.0, 9.0, 0.0},
+        {0.0, 2.0, 4.0, 8.0, 7.0},
+        {9.0, 9.0, 8.0, 5.0, 11.0},
+        {0.0, 0.0, 7.0, 11.0, 6.0}
     };
 
-    tridiagonalize(A);
+    FILE *file_origin = fopen("A_origin.txt", "w");
+    if (file_origin != NULL) {
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                fprintf(file_origin, "%f ", A[i][j]);
+            }
+            fprintf(file_origin, "\n");
+        }
+        fclose(file_origin);
+    } else {
+        printf("Error opening file for writing.\n");
+    }
+
+    int iter = 20;
+
+    for(int i = 0; i < iter; i++){
+        qr_givens(A);
+    }
     FILE *file = fopen("matrix_A.txt", "w");
     if (file != NULL) {
         for (int i = 0; i < N; i++) {
