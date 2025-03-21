@@ -1,56 +1,3 @@
-#include "devoir_1.h"
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-
-void givens_rotation(double a, double b, double *c, double *s) {
-    double norm = sqrt(a * a + b * b);
-    if (norm < 1e-10) {
-        *c = 1.0;
-        *s = 0.0;
-    } else {
-        *c = a / norm;
-        *s = -b / norm;
-    }
-}
-
-// Function to apply Givens rotation to a row-major stored matrix
-void apply_givens(double *A, int n, int k, double c, double s, int i, int j) {
-    for (int col = 0; col < n; col++) {
-        double temp = c * A[i * n + col] - s * A[j * n + col];
-        A[j * n + col] = s * A[i * n + col] + c * A[j * n + col];
-        A[i * n + col] = temp;
-    }
-
-    for (int row = 0; row < n; row++) {
-        double temp = c * A[row * n + i] - s * A[row * n + j];
-        A[row * n + j] = s * A[row * n + i] + c * A[row * n + j];
-        A[row * n + i] = temp;
-    }
-}
-
-// Function to tridiagonalize a symmetric band matrix
-void tridiagonalize_full(double *A, int n, int k, double *d, double *e) {
-    for (int j = 0; j < n - 2; j++) {
-        for (int i = n - 1; i > j + 1; i--) {
-            if (fabs(A[i * n + j]) > 1e-10) {
-                double c, s;
-                givens_rotation(A[(i - 1) * n + j], A[i * n + j], &c, &s);
-                apply_givens(A, n, k, c, s, i - 1, i);
-            }
-        }
-    }
-    
-    for (int i = 0; i < n-1; i++) {
-        d[i] = A[i * n + i];
-        e[i] = A[i * n + i + 1];
-    }
-    d[n-1] = A[(n-1) * n + (n-1)];
-
-}
-
 int step_qr_tridiag(double *d, double *e, int m, double eps){
     double *A = (double *)calloc(m * m, sizeof(double));
     for (int i = 0; i < m; i++) {
@@ -59,6 +6,13 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
             A[i * m + (i + 1)] = e[i];
             A[(i + 1) * m + i] = e[i];
         }
+    }
+    printf("Initial matrix A:\n");
+    for (int row = 0; row < m; row++) {
+        for (int col = 0; col < m; col++) {
+            printf("%f ", A[row * m + col]);
+        }
+        printf("\n");
     }
     double t_nn = A[m * m-1];  // calcul du shift de wilkinson
     double t_n1n1 = A[(m-2) * m + (m-2)];
@@ -113,6 +67,13 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
             }
         }
     }
+    printf("Gauche A:\n");
+    for (int row = 0; row < m; row++) {
+        for (int col = 0; col < m; col++) {
+            printf("%f ", A[row * m + col]);
+        }
+        printf("\n");
+    }
 
         double c1 = cos[0];
         double s1 = sin[0];
@@ -141,6 +102,14 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
                     A[k * m + i+1] = c * R_ik - s * R_jk;
                     A[k * m + i+2] = s * R_ik + c * R_jk;
         }
+        
+        printf("Droite A:\n");
+        for (int row = 0; row < m; row++) {
+            for (int col = 0; col < m; col++) {
+                printf("%f ", A[row * m + col]);
+            }
+            printf("\n");
+        }
     }
     
     free(cos);
@@ -148,12 +117,28 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
     for(int i = 0; i < m; i++){
         A[i * m + i] += mu;
     }
+    printf("Deshift A:\n");
+    for (int row = 0; row < m; row++) {
+        for (int col = 0; col < m; col++) {
+            printf("%f ", A[row * m + col]);
+        }
+        printf("\n");
+    }
     for (int i = 0; i < m; i++) {
         d[i] = A[i * m + i];
     }
     for (int i = 0; i < m - 1; i++) {
         e[i] = A[i * m + (i+1)];
     }
+    printf("d: ");
+    for (int i = 0; i < m; i++) {
+        printf("%f ", d[i]);
+    }
+    printf("\ne: ");
+    for (int i = 0; i < m - 1; i++) {
+        printf("%f ", e[i]);
+    }
+    printf("\n");
 
     if(fabs(A[(m-1) * m + (m-2)]) > eps * (fabs(A[(m-1) * m + (m-1)]) + fabs(A[(m-2) * m + (m-2)]))){
         free(A);
@@ -161,27 +146,4 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
     }
     free(A);
     return m - 1;
-}
-
-int qr_eigs_band(double *A, int n, int k, double eps, int max_iter, double *d){
-    double *dr = (double *)calloc(n, sizeof(double));
-    double *e = (double *)calloc(n-1, sizeof(double));
-    tridiagonalize_full(A, n, k, dr, e);
-    int m = n;
-    int i = 0;
-    int m_temp = m;
-    for (i = 0; i < max_iter && m > 1; i++) {
-        m = step_qr_tridiag(dr, e, m, eps);
-        if (m != m_temp) {
-            d[m] = dr[m];
-        }
-        m_temp = m;
-    }
-    d[0] = dr[0];
-    if (i == max_iter) {
-        return -1;
-    }
-    free(dr);
-    free(e);
-    return i;
 }
