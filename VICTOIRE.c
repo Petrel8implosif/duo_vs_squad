@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
+#define SQUARE(x) ((x) * (x))
 double vector_norm(double *v, int n) {
     double sum = 0.0;
     for (int i = 0; i < n; i++) {
@@ -17,7 +17,7 @@ double vector_norm(double *v, int n) {
 void tridiagonalize_full(double *A, int n, int k, double *d, double *e) {
     for (int k = 0; k < n - 2; k++) {
         double *v = (double *)calloc(n, sizeof(double));
-        double norm_x;
+        double norm_x = 0.0;
 
         // Compute the Householder vector
         for (int i = k + 1; i < n; i++) {
@@ -77,14 +77,12 @@ void tridiagonalize_full(double *A, int n, int k, double *d, double *e) {
         free(q);
     }
     // update d and e with the diagonal and subdiagonal elements respectively
-    for (int k = 0; k < n; k++) {
+    for (int k = 0; k < n-1; k++) {
     d[k] = A[k *n + k];
-    e[k+1] = A[(k + 1) *n + k];
+    e[k] = A[(k + 1) *n + k];
     }
-    e[0] = 0.0;
+    d[n-1] = A[(n-1) *n + (n-1)];
 }
-
-
 int step_qr_tridiag(double *d, double *e, int m, double eps){
     double *A = (double *)calloc(m * m, sizeof(double));
     for (int i = 0; i < m; i++) {
@@ -116,7 +114,8 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
     double *sin = (double *)calloc(m-1, sizeof(double));
 
     for (int i = 0; i < m - 1; i++) {
-        double c, s;
+        double c = 1.0;
+        double s = 0.0;
         double a = A[i * m + i];
         double b = A[(i+1) * m + i];
         double hypot = sqrt(a * a + b * b);
@@ -166,7 +165,8 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
 
     for(int i = 0; i < m-2; i++){
         //droite
-            double c,s;
+            double c = 1.0;
+            double s = 0.0;
             c = cos[i+1];
             s = sin[i+1];
             for (int k = i; k < i+3; k++) {  
@@ -199,7 +199,7 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
 
 int qr_eigs_full(double *A, int n, int k, double eps, int max_iter, double *d){
     double *dr = (double *)calloc(n, sizeof(double));
-    double *e = (double *)calloc(n, sizeof(double));
+    double *e = (double *)calloc(n-1, sizeof(double));
     tridiagonalize_full(A, n, k, dr, e);
     int m = n;
     int i = 0;
@@ -218,4 +218,109 @@ int qr_eigs_full(double *A, int n, int k, double eps, int max_iter, double *d){
     free(dr);
     free(e);
     return i;
+}
+
+double *create_matrix(int nx, int ny, double lx, double ly, int storage) {
+    int lda, k;
+    int size = nx * ny;
+    double dx2 = SQUARE(lx / (nx + 1));
+    double dy2 = SQUARE(ly / (ny + 1));
+    double alpha, beta, gamma;
+    double *L;
+
+    k = nx;
+    alpha = 1. / dx2;
+    beta = 1. / dy2;
+    gamma = 2 * (alpha + beta);
+
+    if (storage == 2) {
+        lda = k + 1;
+        L = (double *)calloc(size * lda, sizeof(double));
+        for (int l = 0; l < size; l++) {
+            L[l * lda + k - k] = -beta;
+            if (l % k != 0)
+                L[l * lda + k - 1] = -alpha;
+            L[l * lda + k - 0] = +gamma;
+        }
+    } else if (storage == 1) {
+        lda = 2 * k + 1;
+        L = (double *)calloc(size * lda, sizeof(double));
+        for (int l = 0; l < size; l++) {
+            L[l * lda + k - k] = -beta;
+            if (l % k != 0)
+                L[l * lda + k - 1] = -alpha;
+            L[l * lda + k + 0] = +gamma;
+            if (l % k != k - 1)
+                L[l * lda + k + 1] = -alpha;
+            L[l * lda + k + k] = -beta;
+        }
+    } else {
+        lda = size;
+        L = (double *)calloc(size * lda, sizeof(double));
+        for (int idx, i = 0; i < ny; i++) {
+            for (int j = 0; j < nx; j++) {
+                idx = i * k + j;
+                L[idx * lda + idx] = gamma;
+                if (0 < i)
+                    L[idx * lda + idx - k] = -beta;
+                if (i < ny - 1)
+                    L[idx * lda + idx + k] = -beta;
+                if (0 < j)
+                    L[idx * lda + idx - 1] = -alpha;
+                if (j < nx - 1)
+                    L[idx * lda + idx + 1] = -alpha;
+            }
+        }
+    }
+    return L;
+}
+
+int main() {
+    /*oui();
+    return 0;*/
+    double lx = 10.0;
+    double ly = 10.0;
+    int nx = 50;
+    int ny = 10;
+    double *E;
+    double *d = (double *)calloc(nx*ny, sizeof(double));
+    E = create_matrix(nx, ny, lx, ly, 0);
+    FILE *file = fopen("A_devoir.txt", "w");
+    if (file != NULL) {
+        for (int i = 0; i < nx*ny; i++) {
+            for (int j = 0; j < nx*ny; j++) {
+                fprintf(file, "%f ", E[i * nx*ny + j]);
+            }
+            fprintf(file, "\n");
+        }
+        fclose(file);
+    } else {
+        printf("Error opening file!\n");
+    }
+    int n = nx * ny;
+
+    int k = 0;
+        for (int row = 0; row < n; row++) {
+            for (int col = 0; col < n; col++) {
+                if (E[row * n + col] != 0) {
+                    int band_width = abs(row - col);
+                    if (band_width > k) {
+                        k = band_width;
+                    }
+                }
+            }
+        }
+    double eps = 1e-12;
+    int max_iter = 10000;
+    printf("k = %d\n", k);
+    int iteration = qr_eigs_full(E, n, k, eps, max_iter,d);
+    printf("Number of iterations");
+    printf("Number of iterations: %d\n", iteration);
+    printf("Eigenvalues:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", d[i]);
+    }
+    free(d);
+    free(E);
+    return 0;
 }
