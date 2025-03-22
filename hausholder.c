@@ -75,10 +75,11 @@ void tridiagonalize_full(double *A, int n, int k, double *d, double *e) {
         free(q);
     }
     // update d and e with the diagonal and subdiagonal elements respectively
-    for (int k = 0; k < n; k++) {
+    for (int k = 0; k < n-1; k++) {
     d[k] = A[k *n + k];
-    e[k] = A[(k + 1) *n + k];
+    e[k+1] = A[(k + 1) *n + k];
     }
+    d[n-1] = A[(n-1) *n + (n-1)];
 }
 
 // Helper function to print a A
