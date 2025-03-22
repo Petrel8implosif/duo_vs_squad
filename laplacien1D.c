@@ -220,3 +220,100 @@ int qr_eigs_full(double *A, int n, int k, double eps, int max_iter, double *d){
     return i;
 }
 
+// Fonction simple de tri (tri à bulles) pour ranger les valeurs propres
+void sort_eigenvalues(int n, double d[]) {
+    for (int i = 0; i < n-1; i++) {
+        for (int j = i+1; j < n; j++) {
+            if (d[i] > d[j]) {
+                double tmp = d[i];
+                d[i] = d[j];
+                d[j] = tmp;
+            }
+        }
+    }
+}
+
+void analytical_values(int n, double d[]) {
+    double dx = 2.0 / (n + 1);
+    for (int i = n; i > 0; i--) {
+        d[n-i] = -4.0 /(dx * dx)  * (sin((i) * M_PI / (2 * (n + 1))) * sin((i) * M_PI / (2 * (n + 1))));
+    }
+}
+
+int main() {
+    int n = 10; // Nombre de noeuds internes
+    int k = 1; // Nombre de sous-diagonales non nulles
+    double dx = 2.0 / (n + 1); // Pas de discrétisation sur [-1, 1]
+    // On construit la matrice tridiagonale du Laplacien discrétisé
+    // Pour le Laplacien, sur chaque noeud, la diagonale vaut -2/(dx^2)
+    // et la sous-diagonale vaut 1/(dx^2)
+    double *d = (double *)calloc(n, sizeof(double)); // diagonale
+    double *e = (double *)calloc(n, sizeof(double)); // sous-diagonale (e[0] non utilisé)
+    for (int i = 0; i < n; i++) {
+        d[i] = -2.0 / (dx * dx);
+        if (i < n - 1) {
+            e[i+1] = 1.0 / (dx * dx);
+        }
+    }
+
+    //print d and e
+    printf("vecteur diagonal:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", d[i]);
+    }
+    printf("vector e:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", e[i]);
+    }
+    
+    
+
+    // construct the matrix A
+    double *A = (double *)calloc(n * n, sizeof(double));
+    for (int i = 0; i < n; i++) {
+        A[i * n + i] = d[i];
+        if (i < n - 1) {
+            A[i * n + (i + 1)] = e[i + 1];
+            A[(i + 1) * n + i] = e[i + 1];
+        }
+    }
+    //print A:
+    printf("Eigenvalues computed by QR:\n");
+    for (int i = 0; i < n*n; i++) {
+        printf("%f\n", A[i]);
+    }
+    
+    double eps = 1e-10;
+    int max_iter = 1000;
+    // Calcul des valeurs propres avec l'algorithme TQL2
+    qr_eigs_full(A, n, k, eps, max_iter, d);
+    
+    // Tri des valeurs propres (optionnel, pour comparer avec la formule analytique rangée par ordre croissant)
+    sort_eigenvalues(n, d);
+    
+    printf("Eigenvalues computed by QR:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", d[i]);
+    }
+    
+    // Calcul des valeurs propres analytiques
+    double *d_analytical = (double *)calloc(n, sizeof(double));
+    analytical_values(n, d_analytical);
+
+    printf("\nAnalytical eigenvalues:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", d_analytical[i]);
+    }
+
+    // Différence entre les valeurs propres calculées et analytiques
+    printf("\nDifference between analytical and computed eigenvalues:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", d[i] - d_analytical[i]);
+    }
+
+    
+    free(d_analytical);
+    free(d);
+    free(e);
+    return 0;
+}

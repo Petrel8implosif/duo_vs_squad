@@ -1,9 +1,7 @@
 #include "devoir_1.h"
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <time.h>
+
 #define SQUARE(x) ((x) * (x))
 double vector_norm(double *v, int n) {
     double sum = 0.0;
@@ -179,13 +177,15 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
     
     free(cos);
     free(sin);
-    for(int i = 0; i < m-1; i++){
+    for(int i = 0; i < m; i++){
         A[i * m + i] += mu;
+    }
+    for (int i = 0; i < m; i++) {
         d[i] = A[i * m + i];
+    }
+    for (int i = 0; i < m - 1; i++) {
         e[i+1] = A[i * m + (i+1)];
     }
-    A[(m-1)*m+(m-1)] += mu;
-    d[m-1] = A[(m-1)*m+(m-1)];
 
     if(fabs(A[(m-1) * m + (m-2)]) > eps * (fabs(A[(m-1) * m + (m-1)]) + fabs(A[(m-2) * m + (m-2)]))){
         free(A);
@@ -216,109 +216,4 @@ int qr_eigs_full(double *A, int n, int k, double eps, int max_iter, double *d){
     free(dr);
     free(e);
     return i;
-}
-
-double *create_matrix(int nx, int ny, double lx, double ly, int storage) {
-    int lda, k;
-    int size = nx * ny;
-    double dx2 = SQUARE(lx / (nx + 1));
-    double dy2 = SQUARE(ly / (ny + 1));
-    double alpha, beta, gamma;
-    double *L;
-
-    k = nx;
-    alpha = 1. / dx2;
-    beta = 1. / dy2;
-    gamma = 2 * (alpha + beta);
-
-    if (storage == 2) {
-        lda = k + 1;
-        L = (double *)calloc(size * lda, sizeof(double));
-        for (int l = 0; l < size; l++) {
-            L[l * lda + k - k] = -beta;
-            if (l % k != 0)
-                L[l * lda + k - 1] = -alpha;
-            L[l * lda + k - 0] = +gamma;
-        }
-    } else if (storage == 1) {
-        lda = 2 * k + 1;
-        L = (double *)calloc(size * lda, sizeof(double));
-        for (int l = 0; l < size; l++) {
-            L[l * lda + k - k] = -beta;
-            if (l % k != 0)
-                L[l * lda + k - 1] = -alpha;
-            L[l * lda + k + 0] = +gamma;
-            if (l % k != k - 1)
-                L[l * lda + k + 1] = -alpha;
-            L[l * lda + k + k] = -beta;
-        }
-    } else {
-        lda = size;
-        L = (double *)calloc(size * lda, sizeof(double));
-        for (int idx, i = 0; i < ny; i++) {
-            for (int j = 0; j < nx; j++) {
-                idx = i * k + j;
-                L[idx * lda + idx] = gamma;
-                if (0 < i)
-                    L[idx * lda + idx - k] = -beta;
-                if (i < ny - 1)
-                    L[idx * lda + idx + k] = -beta;
-                if (0 < j)
-                    L[idx * lda + idx - 1] = -alpha;
-                if (j < nx - 1)
-                    L[idx * lda + idx + 1] = -alpha;
-            }
-        }
-    }
-    return L;
-}
-
-int main() {
-    /*oui();
-    return 0;*/
-    double lx = 10.0;
-    double ly = 10.0;
-    int nx =4;
-    int ny = 4;
-    double *E;
-    double *d = (double *)calloc(nx*ny, sizeof(double));
-    E = create_matrix(nx, ny, lx, ly, 0);
-    FILE *file = fopen("A_devoir.txt", "w");
-    if (file != NULL) {
-        for (int i = 0; i < nx*ny; i++) {
-            for (int j = 0; j < nx*ny; j++) {
-                fprintf(file, "%f ", E[i * nx*ny + j]);
-            }
-            fprintf(file, "\n");
-        }
-        fclose(file);
-    } else {
-        printf("Error opening file!\n");
-    }
-    int n = nx * ny;
-
-    int k = 0;
-        for (int row = 0; row < n; row++) {
-            for (int col = 0; col < n; col++) {
-                if (E[row * n + col] != 0) {
-                    int band_width = abs(row - col);
-                    if (band_width > k) {
-                        k = band_width;
-                    }
-                }
-            }
-        }
-    double eps = 1e-12;
-    int max_iter = 10000;
-    printf("k = %d\n", k);
-    int iteration = qr_eigs_full(E, n, k, eps, max_iter,d);
-    printf("Number of iterations");
-    printf("Number of iterations: %d\n", iteration);
-    printf("Eigenvalues:\n");
-    for (int i = 0; i < n; i++) {
-        printf("%f\n", d[i]);
-    }
-    free(d);
-    free(E);
-    return 0;
 }
