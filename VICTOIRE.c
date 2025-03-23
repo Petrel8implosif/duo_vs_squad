@@ -280,7 +280,7 @@ int main() {
     return 0;*/
     double lx = 10.0;
     double ly = 10.0;
-    int nx = 50;
+    int nx = 10;
     int ny = 10;
     double *E;
     double *d = (double *)calloc(nx*ny, sizeof(double));

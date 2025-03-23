@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#define PI 3.14159265358979323846
 #define SQUARE(x) ((x) * (x))
 double vector_norm(double *v, int n) {
     double sum = 0.0;
@@ -92,6 +93,14 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
             A[(i + 1) * m + i] = e[i];
         }
     }
+    // Print matrix A
+    printf("Matrix A:\n");
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < m; j++) {
+            printf("%f ", A[i * m + j]);
+        }
+        printf("\n");
+    }
     double t_nn = A[m * m-1];  // calcul du shift de wilkinson
     double t_n1n1 = A[(m-2) * m + (m-2)];
     double t_n1n = A[(m-1) * m + (m-2)];
@@ -179,6 +188,14 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
     
     free(cos);
     free(sin);
+    // Print matrix A after QR step
+    printf("Matrix A after QR step:\n");
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < m; j++) {
+            printf("%f ", A[i * m + j]);
+        }
+        printf("\n");
+    }
     for(int i = 0; i < m; i++){
         A[i * m + i] += mu;
     }
@@ -197,9 +214,7 @@ int step_qr_tridiag(double *d, double *e, int m, double eps){
     return m - 1;
 }
 
-int qr_eigs_full(double *A, int n, int k, double eps, int max_iter, double *d){
-    double *e = (double *)calloc(n-1, sizeof(double));
-    tridiagonalize_full(A, n, k, d, e);
+int qr_eigs_full( double *e, int n, int k, double eps, int max_iter, double *d){
     int m = n;
     int i = 0;
     for (i = 0; i < max_iter && m > 1; i++) {
@@ -212,107 +227,58 @@ int qr_eigs_full(double *A, int n, int k, double eps, int max_iter, double *d){
     return i;
 }
 
-double *create_matrix(int nx, int ny, double lx, double ly, int storage) {
-    int lda, k;
-    int size = nx * ny;
-    double dx2 = SQUARE(lx / (nx + 1));
-    double dy2 = SQUARE(ly / (ny + 1));
-    double alpha, beta, gamma;
-    double *L;
+int main(void) {
+    // Choose the number of interior nodes 👎 so that there are n+2 grid points
+    int n = 100; // Feel free to change this value or loop over several n for convergence study
+    double h = 2.0 / (n + 1);  // step size on [-1,1]
 
-    k = nx;
-    alpha = 1. / dx2;
-    beta = 1. / dy2;
-    gamma = 2 * (alpha + beta);
-
-    if (storage == 2) {
-        lda = k + 1;
-        L = (double *)calloc(size * lda, sizeof(double));
-        for (int l = 0; l < size; l++) {
-            L[l * lda + k - k] = -beta;
-            if (l % k != 0)
-                L[l * lda + k - 1] = -alpha;
-            L[l * lda + k - 0] = +gamma;
-        }
-    } else if (storage == 1) {
-        lda = 2 * k + 1;
-        L = (double *)calloc(size * lda, sizeof(double));
-        for (int l = 0; l < size; l++) {
-            L[l * lda + k - k] = -beta;
-            if (l % k != 0)
-                L[l * lda + k - 1] = -alpha;
-            L[l * lda + k + 0] = +gamma;
-            if (l % k != k - 1)
-                L[l * lda + k + 1] = -alpha;
-            L[l * lda + k + k] = -beta;
-        }
-    } else {
-        lda = size;
-        L = (double *)calloc(size * lda, sizeof(double));
-        for (int idx, i = 0; i < ny; i++) {
-            for (int j = 0; j < nx; j++) {
-                idx = i * k + j;
-                L[idx * lda + idx] = gamma;
-                if (0 < i)
-                    L[idx * lda + idx - k] = -beta;
-                if (i < ny - 1)
-                    L[idx * lda + idx + k] = -beta;
-                if (0 < j)
-                    L[idx * lda + idx - 1] = -alpha;
-                if (j < nx - 1)
-                    L[idx * lda + idx + 1] = -alpha;
-            }
-        }
+    // Allocate and build the discrete Laplacian matrix (n x n)
+    double *dr = (double *)calloc(n, sizeof(double));
+    double *er = (double *)calloc(n-1, sizeof(double));
+    for (int i = 0; i < n-1; i++) {
+        // Diagonal entries: -2/h^2
+        dr[i] = -2.0 / (h * h);
+        er[i] = 1.0 / (h * h);
     }
-    return L;
-}
+    dr[n-1] = -2.0 / (h * h);
 
-int main() {
-    /*oui();
-    return 0;*/
-    double lx = 10.0;
-    double ly = 10.0;
-    int nx = 10;
-    int ny = 10;
-    double *E;
-    double *d = (double *)calloc(nx*ny, sizeof(double));
-    E = create_matrix(nx, ny, lx, ly, 0);
-    FILE *file = fopen("A_devoir.txt", "w");
-    if (file != NULL) {
-        for (int i = 0; i < nx*ny; i++) {
-            for (int j = 0; j < nx*ny; j++) {
-                fprintf(file, "%f ", E[i * nx*ny + j]);
-            }
-            fprintf(file, "\n");
-        }
-        fclose(file);
+    // Set parameters for the QR algorithm
+    double eps = 1e-14;
+    int max_iter = 1000;
+
+    int iter = qr_eigs_full(er, n, 1, eps, max_iter, dr);
+    if (iter < 0) {
+        printf("QR algorithm did not converge.\n");
     } else {
-        printf("Error opening file!\n");
+        printf("QR algorithm converged in %d iterations.\n", iter);
     }
-    int n = nx * ny;
 
-    int k = 0;
-        for (int row = 0; row < n; row++) {
-            for (int col = 0; col < n; col++) {
-                if (E[row * n + col] != 0) {
-                    int band_width = abs(row - col);
-                    if (band_width > k) {
-                        k = band_width;
-                    }
-                }
-            }
-        }
-    double eps = 1e-12;
-    int max_iter = 10000;
-    printf("k = %d\n", k);
-    int iteration = qr_eigs_full(E, n, k, eps, max_iter,d);
-    printf("Number of iterations");
-    printf("Number of iterations: %d\n", iteration);
-    printf("Eigenvalues:\n");
+    // Print computed eigenvalues (these approximate the eigenvalues of the FD Laplacian)
+    printf("\nComputed eigenvalues (discrete Laplacian):\n");
     for (int i = 0; i < n; i++) {
-        printf("%f\n", d[i]);
+        printf("Eigenvalue %d: %e\n", i + 1, dr[i]);
     }
-    free(d);
-    free(E);
+
+    // Compare with the analytical eigenvalues.
+    // For the continuous problem u'' = λ u on [-1,1] with u(-1)=u(1)=0,
+    // the eigenvalues are: λ_k = - (kπ/2)^2, k = 1, 2, ..., n.
+    printf("\nAnalytical eigenvalues:\n");
+    for (int k = 1; k <= n; k++) {
+        double lambda_exact = -SQUARE(k * PI / 2.0);
+        printf("Eigenvalue %d: %e\n", k, lambda_exact);
+    }
+
+    // Optionally, compute a total error norm for the first n eigenvalues.
+    double error_norm = 0.0;
+    for (int i = 0; i < n; i++) {
+        // Note: In a more rigorous test, you might want to sort the eigenvalues
+        // before comparing. Here we assume the computed eigenvalues are roughly in order.
+        double lambda_exact = -SQUARE((i + 1) * PI / 2.0);
+        error_norm += fabs(dr[i] - lambda_exact);
+    }
+    printf("\nTotal error norm (sum of absolute differences): %e\n", error_norm);
+
+    free(er);
+    free(dr);
     return 0;
 }
